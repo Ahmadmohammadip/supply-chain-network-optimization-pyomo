@@ -24,6 +24,13 @@ On the `baseline` sample network — 2 candidate plants, 3 candidate warehouses,
 5 customers, 4 periods — the model opens 1 plant and 2 warehouses, rejecting the
 central warehouse and the northern plant.
 
+![The chosen network on the baseline instance](docs/images/network.png)
+
+The two rejected candidates stay on the diagram, hollow and grey: they are as
+much a part of the answer as the sites that opened. Lane thickness is volume
+over the horizon, so the heaviest lane — P_south into W_east — is visible as
+the spine of the plan.
+
 Against the counterfactual of running every candidate facility:
 
 | Component | Optimized | Every facility open | Change |
@@ -123,7 +130,7 @@ supply-chain-network-optimization-pyomo/
 ├── notebooks/01_walkthrough.ipynb
 ├── app/streamlit_app.py
 ├── tests/
-├── docs/formulation.md
+├── docs/                   # formulation.md, images/
 └── .github/workflows/ci.yml
 ```
 
