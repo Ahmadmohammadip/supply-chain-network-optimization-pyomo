@@ -163,3 +163,61 @@ def test_spike_network_builds_stock_ahead_of_the_peak():
     assert peak > system.total_plant_capacity  # unservable from that period alone
     assert result.inventory[("W1", 1)] == pytest.approx(50.0, abs=1e-6)
     assert result.holding_cost > 0
+
+
+def _rescaled(system, demand: float = 1.0, fixed: float = 1.0):
+    """The baseline network with demand and/or fixed costs scaled.
+
+    Mirrors what the Streamlit app's sliders do, so the scenarios the app can
+    reach are the ones covered here.
+    """
+    import json
+
+    from scn_opt.data.loaders import system_from_dict, system_to_dict
+
+    data = system_to_dict(system)
+    for plant in data["plants"]:
+        plant["fixed_cost"] *= fixed
+    for warehouse in data["warehouses"]:
+        warehouse["fixed_cost"] *= fixed
+    for customer in data["customers"]:
+        customer["demand"] = [d * demand for d in customer["demand"]]
+    return system_from_dict(json.loads(json.dumps(data)))
+
+
+def test_free_facilities_are_all_worth_opening():
+    # With opening free, there is nothing to trade against the shipping saving,
+    # so every candidate should be kept and optimizing should save nothing.
+    system = _rescaled(_load("baseline"), fixed=0.0)
+
+    optimized = solve_scn(build_from_system(system))
+    everything = solve_scn(build_from_system(system, force_open_all=True))
+
+    assert len(optimized.open_plants) == len(system.plants)
+    assert len(optimized.open_warehouses) == len(system.warehouses)
+    assert optimized.total_cost == pytest.approx(everything.total_cost, abs=1e-6)
+
+
+def test_dearer_facilities_push_the_network_smaller():
+    # Raising the cost of opening should never grow the network.
+    cheap = _rescaled(_load("baseline"), fixed=0.5)
+    dear = _rescaled(_load("baseline"), fixed=3.0)
+
+    cheap_result = solve_scn(build_from_system(cheap))
+    dear_result = solve_scn(build_from_system(dear))
+
+    assert len(dear_result.open_warehouses) <= len(cheap_result.open_warehouses)
+    assert len(dear_result.open_plants) <= len(cheap_result.open_plants)
+
+
+def test_enough_volume_justifies_the_whole_network():
+    # The other direction: at double demand every candidate facility earns its
+    # keep, so the optimized network and the open-everything counterfactual
+    # coincide. Scale is what moves the strategic answer.
+    system = _rescaled(_load("baseline"), demand=2.0)
+
+    optimized = solve_scn(build_from_system(system))
+    everything = solve_scn(build_from_system(system, force_open_all=True))
+
+    assert len(optimized.open_warehouses) == len(system.warehouses)
+    assert optimized.total_cost == pytest.approx(everything.total_cost, abs=1e-6)
