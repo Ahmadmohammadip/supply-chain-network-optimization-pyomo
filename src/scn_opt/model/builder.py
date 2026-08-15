@@ -255,3 +255,13 @@ def _require_keys(mapping: dict, required: list, label: str) -> None:
             f"{label} is missing {len(missing)} entries, e.g. {missing[:3]} — "
             f"every combination needs a value"
         )
+
+
+def build_from_system(system, force_open_all: bool = False) -> ConcreteModel:
+    """Build the model from a validated `System` (see data/schema.py).
+
+    This is the entry point most callers want. The primitive `build_scn_model`
+    stays public because it predates the schema and is useful for exercising the
+    formulation against hand-built instances with no file format involved.
+    """
+    return build_scn_model(**system.model_inputs(), force_open_all=force_open_all)
