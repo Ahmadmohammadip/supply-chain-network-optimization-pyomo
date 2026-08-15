@@ -1,0 +1,203 @@
+{
+  "name": "baseline",
+  "description": "A regional network: one central warehouse against two local ones.",
+  "plants": [
+    {
+      "name": "P_north",
+      "capacity": 120.0,
+      "production_cost": 1.0,
+      "fixed_cost": 800.0
+    },
+    {
+      "name": "P_south",
+      "capacity": 120.0,
+      "production_cost": 1.2,
+      "fixed_cost": 600.0
+    }
+  ],
+  "warehouses": [
+    {
+      "name": "W_central",
+      "throughput_capacity": 150.0,
+      "storage_capacity": 60.0,
+      "fixed_cost": 400.0,
+      "holding_cost": 0.4,
+      "safety_stock": 5.0,
+      "initial_inventory": 0.0
+    },
+    {
+      "name": "W_east",
+      "throughput_capacity": 80.0,
+      "storage_capacity": 30.0,
+      "fixed_cost": 250.0,
+      "holding_cost": 0.3,
+      "safety_stock": 5.0,
+      "initial_inventory": 0.0
+    },
+    {
+      "name": "W_west",
+      "throughput_capacity": 80.0,
+      "storage_capacity": 30.0,
+      "fixed_cost": 250.0,
+      "holding_cost": 0.3,
+      "safety_stock": 5.0,
+      "initial_inventory": 0.0
+    }
+  ],
+  "customers": [
+    {
+      "name": "C_east_1",
+      "demand": [
+        30.0,
+        35.0,
+        25.0,
+        30.0
+      ]
+    },
+    {
+      "name": "C_east_2",
+      "demand": [
+        20.0,
+        25.0,
+        20.0,
+        15.0
+      ]
+    },
+    {
+      "name": "C_west_1",
+      "demand": [
+        25.0,
+        20.0,
+        30.0,
+        25.0
+      ]
+    },
+    {
+      "name": "C_west_2",
+      "demand": [
+        15.0,
+        20.0,
+        15.0,
+        20.0
+      ]
+    },
+    {
+      "name": "C_middle",
+      "demand": [
+        10.0,
+        15.0,
+        20.0,
+        10.0
+      ]
+    }
+  ],
+  "cost_plant_to_warehouse": [
+    {
+      "plant": "P_north",
+      "warehouse": "W_central",
+      "cost": 2.0
+    },
+    {
+      "plant": "P_north",
+      "warehouse": "W_east",
+      "cost": 1.5
+    },
+    {
+      "plant": "P_north",
+      "warehouse": "W_west",
+      "cost": 3.5
+    },
+    {
+      "plant": "P_south",
+      "warehouse": "W_central",
+      "cost": 2.0
+    },
+    {
+      "plant": "P_south",
+      "warehouse": "W_east",
+      "cost": 3.5
+    },
+    {
+      "plant": "P_south",
+      "warehouse": "W_west",
+      "cost": 1.5
+    }
+  ],
+  "cost_warehouse_to_customer": [
+    {
+      "warehouse": "W_central",
+      "customer": "C_east_1",
+      "cost": 4.0
+    },
+    {
+      "warehouse": "W_central",
+      "customer": "C_east_2",
+      "cost": 4.0
+    },
+    {
+      "warehouse": "W_central",
+      "customer": "C_west_1",
+      "cost": 4.0
+    },
+    {
+      "warehouse": "W_central",
+      "customer": "C_west_2",
+      "cost": 4.0
+    },
+    {
+      "warehouse": "W_central",
+      "customer": "C_middle",
+      "cost": 1.0
+    },
+    {
+      "warehouse": "W_east",
+      "customer": "C_east_1",
+      "cost": 1.0
+    },
+    {
+      "warehouse": "W_east",
+      "customer": "C_east_2",
+      "cost": 1.5
+    },
+    {
+      "warehouse": "W_east",
+      "customer": "C_west_1",
+      "cost": 8.0
+    },
+    {
+      "warehouse": "W_east",
+      "customer": "C_west_2",
+      "cost": 8.5
+    },
+    {
+      "warehouse": "W_east",
+      "customer": "C_middle",
+      "cost": 4.5
+    },
+    {
+      "warehouse": "W_west",
+      "customer": "C_east_1",
+      "cost": 8.5
+    },
+    {
+      "warehouse": "W_west",
+      "customer": "C_east_2",
+      "cost": 8.0
+    },
+    {
+      "warehouse": "W_west",
+      "customer": "C_west_1",
+      "cost": 1.0
+    },
+    {
+      "warehouse": "W_west",
+      "customer": "C_west_2",
+      "cost": 1.5
+    },
+    {
+      "warehouse": "W_west",
+      "customer": "C_middle",
+      "cost": 4.5
+    }
+  ]
+}

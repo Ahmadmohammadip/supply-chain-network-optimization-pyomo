@@ -1,0 +1,48 @@
+{
+  "name": "spike",
+  "description": "A peak bigger than one period of production.",
+  "plants": [
+    {
+      "name": "P1",
+      "capacity": 100.0,
+      "production_cost": 1.0,
+      "fixed_cost": 200.0
+    }
+  ],
+  "warehouses": [
+    {
+      "name": "W1",
+      "throughput_capacity": 200.0,
+      "storage_capacity": 100.0,
+      "fixed_cost": 150.0,
+      "holding_cost": 0.5,
+      "safety_stock": 0.0,
+      "initial_inventory": 0.0
+    }
+  ],
+  "customers": [
+    {
+      "name": "C1",
+      "demand": [
+        20.0,
+        150.0,
+        20.0,
+        20.0
+      ]
+    }
+  ],
+  "cost_plant_to_warehouse": [
+    {
+      "plant": "P1",
+      "warehouse": "W1",
+      "cost": 1.0
+    }
+  ],
+  "cost_warehouse_to_customer": [
+    {
+      "warehouse": "W1",
+      "customer": "C1",
+      "cost": 2.0
+    }
+  ]
+}

@@ -117,7 +117,7 @@ def test_invalid_instance_fails_at_load(tmp_path):
     data = json.loads(json.dumps(INSTANCE))
     data["customers"][0]["demand"] = [10.0, 500.0, 30.0]
 
-    with pytest.raises(ValueError, match="demand in period 2"):
+    with pytest.raises(ValueError, match="demand through period 2 totals 520.0"):
         load_system_json(_write(tmp_path, data))
 
 

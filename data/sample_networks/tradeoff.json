@@ -1,0 +1,67 @@
+{
+  "name": "tradeoff",
+  "description": "PROJECT_BRIEF.md section 4, reduced to the decision it is about.",
+  "plants": [
+    {
+      "name": "P1",
+      "capacity": 10000.0,
+      "production_cost": 0.0,
+      "fixed_cost": 0.0
+    }
+  ],
+  "warehouses": [
+    {
+      "name": "W_cheap_fixed",
+      "throughput_capacity": 10000.0,
+      "storage_capacity": 10000.0,
+      "fixed_cost": 100.0,
+      "holding_cost": 0.0,
+      "safety_stock": 0.0,
+      "initial_inventory": 0.0
+    },
+    {
+      "name": "W_cheap_shipping",
+      "throughput_capacity": 10000.0,
+      "storage_capacity": 10000.0,
+      "fixed_cost": 1000.0,
+      "holding_cost": 0.0,
+      "safety_stock": 0.0,
+      "initial_inventory": 0.0
+    }
+  ],
+  "customers": [
+    {
+      "name": "C1",
+      "demand": [
+        57.0,
+        57.0,
+        57.0,
+        57.0
+      ]
+    }
+  ],
+  "cost_plant_to_warehouse": [
+    {
+      "plant": "P1",
+      "warehouse": "W_cheap_fixed",
+      "cost": 0.0
+    },
+    {
+      "plant": "P1",
+      "warehouse": "W_cheap_shipping",
+      "cost": 0.0
+    }
+  ],
+  "cost_warehouse_to_customer": [
+    {
+      "warehouse": "W_cheap_fixed",
+      "customer": "C1",
+      "cost": 5.0
+    },
+    {
+      "warehouse": "W_cheap_shipping",
+      "customer": "C1",
+      "cost": 1.0
+    }
+  ]
+}

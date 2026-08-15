@@ -144,17 +144,58 @@ def test_negative_shipping_cost_is_rejected():
         _system(cost_plant_to_warehouse={("P1", "W1"): -2.0})
 
 
-def test_demand_beyond_total_plant_capacity_is_rejected():
-    # Per period, not over the horizon: capacity is a rate, so a peak can be
-    # unservable even when the totals look comfortable.
-    with pytest.raises(ValueError, match="demand in period 2 is 150.0, above the 100.0"):
-        _system(customers=[Customer(name="C1", demand=[10.0, 150.0, 10.0])])
+def test_demand_beyond_cumulative_production_is_rejected():
+    # Cumulative, not per period: output can be banked forward but never
+    # borrowed from the future, so the binding comparison is demand-so-far
+    # against production-so-far.
+    with pytest.raises(ValueError, match="demand through period 1 totals 150.0"):
+        _system(customers=[Customer(name="C1", demand=[150.0, 10.0, 10.0])])
+
+
+def test_a_peak_larger_than_one_period_of_production_is_accepted():
+    # 150 in period 2 against a 100-per-period plant is servable by producing
+    # early and holding, so validation must not reject it. Applying brief
+    # section 1.6's per-period rule literally would (see section 8.2).
+    system = _system(
+        # Throughput has to clear the peak; it is storage and production that
+        # the pre-building relaxes.
+        warehouses=[Warehouse(name="W1", throughput_capacity=200.0, storage_capacity=100.0)],
+        customers=[Customer(name="C1", demand=[10.0, 150.0, 10.0])],
+    )
+
+    assert system.demand_by_period == pytest.approx([10.0, 150.0, 10.0])
+
+
+def test_opening_stock_counts_towards_early_demand():
+    # Stock already on hand is supply available before any production happens.
+    stocked = Warehouse(
+        name="W1", throughput_capacity=200.0, storage_capacity=60.0, initial_inventory=60.0
+    )
+    system = _system(
+        warehouses=[stocked],
+        customers=[Customer(name="C1", demand=[150.0, 10.0, 10.0])],
+    )
+
+    assert system.total_demand == pytest.approx(170.0)
+
+
+def test_demand_beyond_warehouse_throughput_is_rejected():
+    # Throughput is the one limit pre-building cannot relax: whatever is
+    # consumed in a period still has to leave a warehouse that period.
+    with pytest.raises(ValueError, match="every warehouse together could ship"):
+        _system(
+            warehouses=[Warehouse(name="W1", throughput_capacity=40.0)],
+            customers=[Customer(name="C1", demand=[10.0, 90.0, 10.0])],
+        )
 
 
 def test_demand_exactly_at_capacity_is_accepted():
     # The tolerance exists so an exactly-balanced instance is not rejected by
     # floating-point noise.
-    system = _system(customers=[Customer(name="C1", demand=[100.0, 100.0, 100.0])])
+    system = _system(
+        warehouses=[Warehouse(name="W1", throughput_capacity=100.0)],
+        customers=[Customer(name="C1", demand=[100.0, 100.0, 100.0])],
+    )
 
     assert system.demand_by_period == pytest.approx([100.0] * 3)
 

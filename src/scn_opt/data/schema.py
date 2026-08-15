@@ -194,16 +194,52 @@ class System:
         ):
             raise ValueError("shipping costs must be >= 0")
 
-        # The cheap aggregate feasibility check from PROJECT_BRIEF.md section 1.6.
-        # Per period, because plant capacity is a rate: a horizon whose total
-        # capacity covers total demand can still be unservable in a peak period.
-        capacity = self.total_plant_capacity
-        for t, total in enumerate(self.demand_by_period, start=1):
-            if total > capacity + _TOLERANCE:
+        self._check_aggregate_feasibility()
+
+    def _check_aggregate_feasibility(self) -> None:
+        """The cheap necessary conditions from PROJECT_BRIEF.md section 1.6.
+
+        Section 1.6 states the production check per period — demand in any one
+        period above total plant capacity. That is **too strict for a model that
+        holds inventory** (see PROJECT_BRIEF.md section 8.2): production can be
+        banked, so a peak larger than a single period's output is servable by
+        building ahead. Applying the per-period rule would reject the `spike`
+        sample network, which solves perfectly well.
+
+        What actually holds is the cumulative version: output can be moved
+        forward in time but never borrowed from the future, so demand through
+        period t must fit within opening stock plus t periods of production.
+
+        Throughput is the opposite case. Every unit consumed in a period must
+        leave a warehouse in that same period, so *that* limit really is
+        per-period and no amount of pre-building relaxes it.
+
+        Both are necessary, not sufficient: neither can tell whether flow can
+        actually route through the network, which is left to the solver.
+        """
+        opening_stock = sum(w.initial_inventory for w in self.warehouses)
+        production_per_period = self.total_plant_capacity
+        outbound_per_period = sum(w.throughput_capacity for w in self.warehouses)
+
+        cumulative_demand = 0.0
+        for t, period_demand in enumerate(self.demand_by_period, start=1):
+            cumulative_demand += period_demand
+            available = opening_stock + production_per_period * t
+
+            if cumulative_demand > available + _TOLERANCE:
                 raise ValueError(
-                    f"demand in period {t} is {total}, above the {capacity} every plant "
-                    f"could produce in a period even with all of them open — no plan "
-                    f"can serve it, since this model has no backorders"
+                    f"demand through period {t} totals {cumulative_demand}, above the "
+                    f"{available} available by then ({opening_stock} opening stock plus "
+                    f"{t} period(s) at {production_per_period} with every plant open) — "
+                    f"no plan can serve it, since this model has no backorders"
+                )
+
+            if period_demand > outbound_per_period + _TOLERANCE:
+                raise ValueError(
+                    f"demand in period {t} is {period_demand}, above the "
+                    f"{outbound_per_period} every warehouse together could ship in a "
+                    f"period — holding stock in advance cannot help, because the units "
+                    f"still have to leave a warehouse in the period they are consumed"
                 )
 
     @property
