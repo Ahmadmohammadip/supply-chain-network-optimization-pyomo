@@ -1,19 +1,37 @@
 """
 Builds a Pyomo ConcreteModel for multi-echelon supply chain network planning.
 
-Phase 1 scope — the operational layer only: production, two shipping legs, and
-warehouse inventory across a multi-period horizon, with every facility assumed
-open. The strategic layer (open/close binaries and fixed costs) arrives in
-phase 2. docs/formulation.md carries the full model.
+The complete model: a strategic layer deciding which plants and warehouses to
+open, and an operational layer deciding production, shipping, and inventory
+across a multi-period horizon — solved together as one MILP rather than in
+sequence. docs/formulation.md carries the derivation and citations.
 
-    min   sum_t [ production + inbound shipping + outbound shipping + holding ]
-    s.t.  sum_w ship_pw[p,w,t] <= plant_capacity[p]           (production)
-          I[w,t] = I[w,t-1] + sum_p ship_pw - sum_c ship_wc   (inventory balance)
-          sum_p ship_pw[p,w,t] <= throughput_capacity[w]      (inbound)
-          sum_c ship_wc[w,c,t] <= throughput_capacity[w]      (outbound)
-          I[w,t] <= storage_capacity[w]                       (storage)
-          I[w,t] >= safety_stock[w]                           (policy floor)
-          sum_w ship_wc[w,c,t] = demand[c,t]                  (met exactly)
+    min   fixed + production + inbound shipping + outbound shipping + holding
+    s.t.  sum_w ship_pw[p,w,t] <= plant_capacity[p] * open_plant[p]
+          I[w,t] = I[w,t-1] + sum_p ship_pw - sum_c ship_wc
+          sum_p ship_pw[p,w,t] <= throughput_capacity[w] * open_warehouse[w]
+          sum_c ship_wc[w,c,t] <= throughput_capacity[w] * open_warehouse[w]
+          I[w,t] <= storage_capacity[w] * open_warehouse[w]
+          I[w,t] >= safety_stock[w] * open_warehouse[w]
+          sum_w ship_wc[w,c,t] = demand[c,t]
+
+## Facilities are open for the whole horizon
+
+`open_plant` and `open_warehouse` carry no time index: a facility is open for
+the entire horizon or not at all. Phased opening and closing would need
+time-indexed binaries and is out of scope (PROJECT_BRIEF.md section 5).
+
+One consequence worth knowing: fixed cost is charged **once**, not per period,
+so the horizon length is itself a lever on the strategic/operational balance.
+A longer horizon accumulates more variable cost against the same one-off fixed
+cost, which makes the model readier to pay for a facility that ships cheaply.
+
+## Capacity does the work of big-M
+
+Every open/close binary multiplies a real capacity, never an arbitrary large
+constant. That is deliberate — a loose big-M weakens the linear relaxation and
+can cause numerical trouble; the capacity is both the tightest valid bound and
+the physically meaningful one.
 
 ## Throughput and storage are separate capacities
 
@@ -23,10 +41,6 @@ in two (see PROJECT_BRIEF.md section 8.1). A warehouse is rated for how much it
 can move per period and, separately, for how much it can keep — which is what
 distinguishes a cross-dock (high throughput, no storage) from a holding depot.
 
-The property the brief cares about is preserved: capacities are used directly
-as the bound, so when the binaries arrive in phase 2 they multiply a real
-capacity rather than an arbitrary big-M constant.
-
 ## Demand is met exactly
 
 No backorders, no lost sales. An instance whose demand cannot be served comes
@@ -35,6 +49,7 @@ aggregate capacity against aggregate demand before the solver ever sees it.
 """
 
 from pyomo.environ import (
+    Binary,
     ConcreteModel,
     Constraint,
     NonNegativeReals,
@@ -61,13 +76,25 @@ def build_scn_model(
     initial_inventory: dict,
     cost_plant_to_warehouse: dict,
     cost_warehouse_to_customer: dict,
+    fixed_cost_plant: dict | None = None,
+    fixed_cost_warehouse: dict | None = None,
+    force_open_all: bool = False,
 ) -> ConcreteModel:
-    """Build the operational model from primitive inputs.
+    """Build the network model from primitive inputs.
 
     `demand` is keyed by (customer, period) with periods 1..n_periods; the two
     cost maps are keyed by (plant, warehouse) and (warehouse, customer) and must
-    cover every pair. Callers holding a validated `System` should use
-    `build_from_system`, which unpacks it and calls this.
+    cover every pair. Fixed costs default to zero, which makes opening free and
+    reduces the model to its operational layer.
+
+    `force_open_all` pins every facility open while still charging its fixed
+    cost, giving the counterfactual "what if we ran the whole candidate
+    network?" against which the optimized network can be compared. Because it
+    fixes the binaries rather than removing them, the two objectives are
+    directly comparable.
+
+    Callers holding a validated `System` should use `build_from_system`, which
+    unpacks it and calls this.
     """
     if n_periods < 1:
         raise ValueError(f"n_periods must be >= 1, got {n_periods}")
@@ -78,6 +105,9 @@ def build_scn_model(
     ):
         if not collection:
             raise ValueError(f"model needs at least one entry in {label}")
+
+    fixed_cost_plant = fixed_cost_plant or dict.fromkeys(plants, 0.0)
+    fixed_cost_warehouse = fixed_cost_warehouse or dict.fromkeys(warehouses, 0.0)
 
     periods = list(range(1, n_periods + 1))
     _require_keys(demand, [(c, t) for c in customers for t in periods], "demand")
@@ -91,6 +121,8 @@ def build_scn_model(
         [(w, c) for w in warehouses for c in customers],
         "cost_warehouse_to_customer",
     )
+    _require_keys(fixed_cost_plant, list(plants), "fixed_cost_plant")
+    _require_keys(fixed_cost_warehouse, list(warehouses), "fixed_cost_warehouse")
 
     m = ConcreteModel(name="SupplyChainNetwork")
 
@@ -111,16 +143,29 @@ def build_scn_model(
     m.initial_inventory = Param(m.W, initialize=dict(initial_inventory))
     m.cost_pw = Param(m.P, m.W, initialize=dict(cost_plant_to_warehouse))
     m.cost_wc = Param(m.W, m.C, initialize=dict(cost_warehouse_to_customer))
+    m.fixed_cost_plant = Param(m.P, initialize=dict(fixed_cost_plant))
+    m.fixed_cost_warehouse = Param(m.W, initialize=dict(fixed_cost_warehouse))
 
     # --- Variables ---
+    m.open_plant = Var(m.P, domain=Binary)
+    m.open_warehouse = Var(m.W, domain=Binary)
     m.ship_pw = Var(m.P, m.W, m.T, domain=NonNegativeReals)
     m.ship_wc = Var(m.W, m.C, m.T, domain=NonNegativeReals)
     m.inventory = Var(m.W, m.T, domain=NonNegativeReals)
+
+    if force_open_all:
+        for p in plants:
+            m.open_plant[p].fix(1)
+        for w in warehouses:
+            m.open_warehouse[w].fix(1)
 
     # --- Objective ---
     # Held as named expressions so solve.py can report a cost breakdown that
     # provably sums to the objective, rather than recomputing it independently
     # and hoping the two agree.
+    m.fixed_expr = sum(
+        m.fixed_cost_plant[p] * m.open_plant[p] for p in m.P
+    ) + sum(m.fixed_cost_warehouse[w] * m.open_warehouse[w] for w in m.W)
     m.production_expr = sum(
         m.production_cost[p] * m.ship_pw[p, w, t] for p in m.P for w in m.W for t in m.T
     )
@@ -135,14 +180,18 @@ def build_scn_model(
     )
 
     m.total_cost = Objective(
-        expr=m.production_expr + m.inbound_expr + m.outbound_expr + m.holding_expr,
+        expr=m.fixed_expr
+        + m.production_expr
+        + m.inbound_expr
+        + m.outbound_expr
+        + m.holding_expr,
         sense=minimize,
     )
 
     # --- Constraints ---
 
     def _plant_capacity_rule(m, p, t):
-        return sum(m.ship_pw[p, w, t] for w in m.W) <= m.plant_capacity[p]
+        return sum(m.ship_pw[p, w, t] for w in m.W) <= m.plant_capacity[p] * m.open_plant[p]
 
     m.plant_capacity_con = Constraint(m.P, m.T, rule=_plant_capacity_rule)
 
@@ -159,17 +208,23 @@ def build_scn_model(
     m.inventory_balance_con = Constraint(m.W, m.T, rule=_inventory_balance_rule)
 
     def _inbound_throughput_rule(m, w, t):
-        return sum(m.ship_pw[p, w, t] for p in m.P) <= m.throughput_capacity[w]
+        return (
+            sum(m.ship_pw[p, w, t] for p in m.P)
+            <= m.throughput_capacity[w] * m.open_warehouse[w]
+        )
 
     m.inbound_throughput_con = Constraint(m.W, m.T, rule=_inbound_throughput_rule)
 
     def _outbound_throughput_rule(m, w, t):
-        return sum(m.ship_wc[w, c, t] for c in m.C) <= m.throughput_capacity[w]
+        return (
+            sum(m.ship_wc[w, c, t] for c in m.C)
+            <= m.throughput_capacity[w] * m.open_warehouse[w]
+        )
 
     m.outbound_throughput_con = Constraint(m.W, m.T, rule=_outbound_throughput_rule)
 
     def _storage_rule(m, w, t):
-        return m.inventory[w, t] <= m.storage_capacity[w]
+        return m.inventory[w, t] <= m.storage_capacity[w] * m.open_warehouse[w]
 
     m.storage_con = Constraint(m.W, m.T, rule=_storage_rule)
 
@@ -177,8 +232,11 @@ def build_scn_model(
     # demand variability to derive one from. Note the consequence: stock held to
     # satisfy this is never drawn down, so it is produced once and then charged
     # holding cost in every period.
+    #
+    # Gated on the binary so it only applies to warehouses that actually open;
+    # a closed one is already forced to zero inventory by the storage bound.
     def _safety_stock_rule(m, w, t):
-        return m.inventory[w, t] >= m.safety_stock[w]
+        return m.inventory[w, t] >= m.safety_stock[w] * m.open_warehouse[w]
 
     m.safety_stock_con = Constraint(m.W, m.T, rule=_safety_stock_rule)
 
