@@ -240,3 +240,73 @@ document, before any code was written. The multi-echelon network design
 + inventory structure follows well-established supply chain optimization
 literature (cited above), not an original formulation. Nothing in this
 document should be treated as already implemented.
+
+## 8. Decisions made after this brief
+Everything above is preserved as written, as the record of what was agreed
+before implementation started. The following decisions were taken afterwards
+and **supersede** it where they conflict. `docs/formulation.md` describes what
+the code actually does.
+
+### 8.1 Warehouse capacity is split in two (changes §1.5)
+§1.5 uses a single parameter $\overline{Q}_w$ as the warehouse's inbound limit
+per period, its outbound limit per period, and its storage capacity. The model
+splits this into `throughput_capacity` (caps inbound and outbound, each per
+period) and `storage_capacity` (caps inventory held between periods).
+
+A warehouse is rated for two different things — how much it can move, and how
+much it can keep. Collapsing them means a site rated 100 may receive 100, ship
+100, and hold 100 in the same period, and makes a pure cross-dock (high
+throughput, no storage) inexpressible. Leaving `storage_capacity` unset makes it
+equal to throughput, recovering §1.5's behavior exactly.
+
+The property §1.5 is actually concerned with is unchanged: capacities still
+multiply the binaries directly, so there is no arbitrary big-M anywhere.
+
+### 8.2 The feasibility check is cumulative, not per period (corrects §1.6)
+§1.6 says an instance is infeasible if total demand in any period exceeds total
+plant capacity. **That is too strict for a model that carries inventory**, and
+it is wrong rather than merely conservative: production can be banked, so a peak
+larger than a single period of output is servable by building ahead. Applied
+literally the rule rejects this repo's own `spike` sample network, which solves
+without difficulty.
+
+Replaced by the two conditions that do hold:
+
+- **Cumulative production.** Output moves forward in time but is never borrowed
+  from the future, so demand through period $t$ must fit within opening stock
+  plus $t$ periods of production.
+- **Per-period outbound throughput.** Whatever is consumed in a period must
+  leave a warehouse in that period, so this one really is per-period and
+  pre-building cannot relax it.
+
+Both are necessary, not sufficient. §1.6's judgement that network-level
+routability should be left to the solver is kept unchanged.
+
+### 8.3 The operational-only model is kept as a counterfactual (extends §3)
+Phase 1 in §3 builds an operational model with every facility pre-opened, as
+scaffolding for the MILP. Rather than discard it, the finished builder keeps a
+`force_open_all` option that pins every facility open **while still charging its
+fixed cost**, so its objective is directly comparable with the optimized one.
+
+The difference between them is what the strategic decision is worth. The
+notebook, the README, and the Streamlit app all report it, and it is the honest
+way to show that the model earns its complexity.
+
+### 8.4 Public at completion rather than from commit 1 (changes §6)
+All eight phases were built and committed locally, then pushed as a complete
+history to a new public repo. The phase-per-commit convention and the commit
+message prefixes in §6 were kept; only the timing of publication changed.
+
+### 8.5 Brief filename
+Renamed from `SCN_PROJECT_BRIEF.md` to `PROJECT_BRIEF.md`, matching this
+document's own §2 repo tree and the three sibling repos.
+
+### 8.6 Minor additions not specified in §2
+- Beyond the four test files in §2: `test_schema_validation.py`,
+  `test_loaders.py`, `test_viz.py`, and a `conftest.py` holding the Agg backend
+  selection and the hand-checkable base case.
+- `data/sample_networks/generate_networks.py`, which builds the sample
+  instances through the schema so anything it emits has already been validated.
+- `load_demand_csv()` and `load_demand_csv_text()` alongside the JSON loader, so
+  a forecast can be dropped into an existing network — networks change rarely,
+  forecasts constantly — and so the app can accept an upload without a temp file.
