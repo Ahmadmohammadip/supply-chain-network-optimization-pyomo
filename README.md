@@ -173,19 +173,22 @@ every period. Full list with rationale in `docs/formulation.md`.
 
 ## Companion repos
 
-Four standalone optimization models built to the same conventions — validated
+Five standalone optimization models built to the same conventions — validated
 dataclasses that fail loudly at construction, a Pyomo builder that never touches
 raw files, and a result dataclass rather than a live model — but sharing no code.
 
 - [economic-dispatch-pyomo](https://github.com/Ahmadmohammadip/economic-dispatch-pyomo)
-  — multi-period, multi-bus DC-OPF economic dispatch with generator ramping,
-  curtailable renewables, storage, and locational marginal prices.
+  — multi-period, multi-bus DC-OPF economic dispatch with generator
+  ramping, curtailable renewables, storage, and locational marginal prices.
 - [battery-storage-optimization-pyomo](https://github.com/Ahmadmohammadip/battery-storage-optimization-pyomo)
-  — battery energy arbitrage co-optimized with frequency regulation capacity
-  (revenue stacking) as a single LP.
+  — battery energy arbitrage co-optimized with frequency regulation
+  capacity (revenue stacking) as a single LP.
 - [cvrp-optimization-pyomo](https://github.com/Ahmadmohammadip/cvrp-optimization-pyomo)
-  — exact MILP for the Capacitated Vehicle Routing Problem, with a measured
-  benchmark of where exact methods stop scaling.
+  — exact MILP for the Capacitated Vehicle Routing Problem, with a
+  measured benchmark of where exact methods stop scaling.
+- [forecast-driven-bess-dispatch](https://github.com/Ahmadmohammadip/forecast-driven-bess-dispatch)
+  — ML forecasts of load, PV and price feeding a Pyomo dispatch LP for a
+  behind-the-meter battery, measuring what the forecast is actually worth.
 
 ## License
 
