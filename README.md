@@ -173,7 +173,7 @@ every period. Full list with rationale in `docs/formulation.md`.
 
 ## Companion repos
 
-Six standalone optimization models built to the same conventions — validated
+Seven standalone optimization models built to the same conventions — validated
 dataclasses that fail loudly at construction, a builder that never touches raw
 files, and a result dataclass rather than a live model — but sharing no code.
 
@@ -193,6 +193,11 @@ files, and a result dataclass rather than a live model — but sharing no code.
   — a stateful digital twin of an office: an RC thermal model identified
   from telemetry, fault detection scored against injected faults, and
   comfort-constrained MPC over HVAC and a battery.
+- [resilient-microgrid-optimization](https://github.com/Ahmadmohammadip/resilient-microgrid-optimization)
+  — a MILP that operates a distribution feeder through a 72-hour extreme
+  event: which lines to close, which sections to energise, what to dispatch
+  and what to shed, subject to a radiality constraint that is enforced
+  mathematically rather than asserted.
 
 ## License
 
